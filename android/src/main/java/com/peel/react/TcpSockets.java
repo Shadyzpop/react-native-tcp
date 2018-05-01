@@ -224,6 +224,12 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
         if (mShuttingDown) {
             return;
         }
+
+        if (dataReceiverMode) {
+            lastData = Base64.encodeToString(data, Base64.NO_WRAP);
+            return;
+        }
+        
         WritableMap eventParams = Arguments.createMap();
         eventParams.putInt("id", id);
         eventParams.putString("data", Base64.encodeToString(data, Base64.NO_WRAP));
@@ -234,11 +240,6 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
     @Override
     public void onClose(Integer id, String error) {
         if (mShuttingDown) {
-            return;
-        }
-
-        if (dataReceiverMode) {
-            lastData = Base64.encodeToString(data, Base64.NO_WRAP);
             return;
         }
 
