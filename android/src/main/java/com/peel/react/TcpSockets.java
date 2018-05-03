@@ -34,9 +34,6 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
     private static final String TAG = "TcpSockets";
 
     private boolean mShuttingDown = false;
-    private boolean dataReceiverMode = false;
-    private String lastData = "";
-
     private TcpSocketManager socketManager;
 
     private ReactContext mReactContext;
@@ -109,9 +106,7 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
         new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
             @Override
             protected void doInBackgroundGuarded(Void... params) {
-                if (options.getBoolean("dataReceiverMode")) {
-                    dataReceiverMode = true;
-                }
+                // NOTE : ignoring options for now, just use the available interface.
                 try {
                     socketManager.connect(cId, host, port);
                 } catch (UnknownHostException uhe) {
@@ -134,17 +129,6 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
                 if (callback != null) {
                     callback.invoke();
                 }
-            }
-        }.execute();
-    }
-
-    @ReactMethod
-    public void cancel(final Integer cId) {
-        new GuardedAsyncTask<Void, Void>(getReactApplicationContext()) {
-            @Override
-            protected void doInBackgroundGuarded(Void... params) {
-                socketManager.cancel(cId);
-                onError(cId, "Connection timeout");
             }
         }.execute();
     }
@@ -210,26 +194,11 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
         sendEvent("connect", eventParams);
     }
 
-    @ReactMethod
-    public void retrieveLastData(Integer id) {
-        WritableMap eventParams = Arguments.createMap();
-        eventParams.putInt("id", id);
-        eventParams.putString("data", lastData);
-
-        sendEvent("data", eventParams);
-    }
-
     @Override
     public void onData(Integer id, byte[] data) {
         if (mShuttingDown) {
             return;
         }
-
-        if (dataReceiverMode) {
-            lastData = Base64.encodeToString(data, Base64.NO_WRAP);
-            return;
-        }
-        
         WritableMap eventParams = Arguments.createMap();
         eventParams.putInt("id", id);
         eventParams.putString("data", Base64.encodeToString(data, Base64.NO_WRAP));
@@ -242,7 +211,6 @@ public final class TcpSockets extends ReactContextBaseJavaModule implements TcpS
         if (mShuttingDown) {
             return;
         }
-
         if (error != null) {
             onError(id, error);
         }

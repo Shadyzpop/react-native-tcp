@@ -8,7 +8,7 @@
 
 'use strict';
 
-global.process = global.process || require('process'); // needed to make stream-browserify happy
+global.process = require('process'); // needed to make stream-browserify happy
 var Buffer = global.Buffer = global.Buffer || require('buffer').Buffer;
 
 var util = require('util');
@@ -38,7 +38,6 @@ function TcpSocket(options: ?{ id: ?number }) {
   if (options && options.id) {
     // e.g. incoming server connections
     this._id = Number(options.id);
-    this._options = options;
 
     if (this._id <= instances) {
       throw new Error('Socket id ' + this._id + 'already in use');
@@ -85,8 +84,6 @@ TcpSocket.prototype.connect = function(options, callback) : TcpSocket {
     return TcpSocket.prototype.connect.apply(this, args);
   }
 
-  this._options = options;
-
   if (typeof callback === 'function') {
     this.once('connect', callback);
   }
@@ -117,11 +114,7 @@ TcpSocket.prototype.connect = function(options, callback) : TcpSocket {
   }
 
   if (options.timeout) {
-    this.setTimeout(options.timeout, () => {
-      if (this._state === STATE.CONNECTING) {
-        Sockets.cancel(this._id);
-      }
-    });
+    this.setTimeout(options.timeout);
   } else if (this._timeout) {
     this._activeTimer(this._timeout.msecs);
   }
@@ -203,7 +196,11 @@ TcpSocket.prototype.setTimeout = function(msecs: number, callback: () => void) {
       this.removeListener('timeout', callback);
     }
   } else {
-    this._activeTimer(msecs, callback);
+    if (callback) {
+      this.once('timeout', callback);
+    }
+
+    this._activeTimer(msecs);
   }
 
   return this;
@@ -244,10 +241,6 @@ TcpSocket.prototype.destroy = function() {
 
     Sockets.destroy(this._id);
   }
-};
-
-TcpSocket.prototype.retrieveLastData = function () {
-  Sockets.retrieveLastData(this._id);
 };
 
 TcpSocket.prototype._registerEvents = function(): void {
@@ -316,13 +309,7 @@ TcpSocket.prototype._onConnection = function(info: { id: number, address: { port
 TcpSocket.prototype._onData = function(data: string): void {
   this._debug('received', 'data');
 
-  if (this._options && this._options.timeout) {
-    this._clearTimeout();
-
-    this.setTimeout(this._options.timeout, () => {
-      Sockets.destroy(this._id);
-    });
-  } else if (this._timeout) {
+  if (this._timeout) {
     this._activeTimer(this._timeout.msecs);
   }
 
